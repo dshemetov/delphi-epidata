@@ -1,14 +1,14 @@
 ---
 title: ILI Nearby Nowcast
-parent: Epidata API (Other Epidemics)
+parent: Epidata API (Other Diseases)
 ---
 
 # ILI Nearby Nowcast
 
-This is the documentation of the API for accessing the ILI Nearby (`nowcast`) data source of
+This is the documentation of the API for accessing the ILI Nearby (`nowcast`) endpoint of
 the [Delphi](https://delphi.cmu.edu/)'s epidemiological data.
 
-General topics not specific to any particular data source are discussed in the
+General topics not specific to any particular endpoint are discussed in the
 [API overview](README.md). Such topics include:
 [contributing](README.md#contributing), [citing](README.md#citing), and
 [data licensing](README.md#data-licensing).
@@ -16,7 +16,7 @@ General topics not specific to any particular data source are discussed in the
 ## ILI Nearby Data
 
 A nowcast of U.S. national, regional, and state-level (weighted) %ILI, available seven days (regionally) or five days (state-level) before the first ILINet report for the corresponding week.
- - Data source: [Delphi's ILI Nearby system](https://delphi.cmu.edu/nowcast/)
+ - Source: [Delphi's ILI Nearby system](https://delphi.cmu.edu/nowcast/)
  - Temporal Resolution: Weekly, from 2010w30*
  - Spatial Resolution: National, [HHS regions](http://www.hhs.gov/iea/regional/), [Census divisions](http://www.census.gov/econ/census/help/geography/regions_and_divisions.html) ([1+10+9](../../labels/regions.txt)), and by state/territory ([51](../../labels/states.txt))
  - Open access
@@ -25,7 +25,7 @@ A nowcast of U.S. national, regional, and state-level (weighted) %ILI, available
 
 # The API
 
-The base URL is: https://delphi.cmu.edu/epidata/api.php
+The base URL is: https://delphi.cmu.edu/epidata/nowcast/
 
 See [this documentation](README.md) for details on specifying epiweeks, dates, and lists.
 
@@ -53,7 +53,7 @@ See [this documentation](README.md) for details on specifying epiweeks, dates, a
 # Example URLs
 
 ### ILI Nearby on 2020w01 (national)
-https://delphi.cmu.edu/epidata/api.php?source=nowcast&locations=nat&epiweeks=202001
+https://delphi.cmu.edu/epidata/nowcast/?locations=nat&epiweeks=202001
 
 ```json
 {
@@ -73,32 +73,19 @@ https://delphi.cmu.edu/epidata/api.php?source=nowcast&locations=nat&epiweeks=202
 
 # Code Samples
 
-Libraries are available for [CoffeeScript](../../src/client/delphi_epidata.coffee), [JavaScript](../../src/client/delphi_epidata.js), [Python](../../src/client/delphi_epidata.py), and [R](../../src/client/delphi_epidata.R).
+Libraries are available for [JavaScript](../../src/client/delphi_epidata.js), [Python](../../src/client/delphi_epidata.py), and [R](../../src/client/delphi_epidata.R).
 The following samples show how to import the library and fetch national ILI Nearby data for epiweeks `201940` and `202001-202010` (11 weeks total).
-
-### CoffeeScript (in Node.js)
-
-````coffeescript
-# Import
-{Epidata} = require('./delphi_epidata')
-# Fetch data
-callback = (result, message, epidata) ->
-  console.log(result, message, epidata?.length)
-Epidata.nowcast(callback, ['nat'], [201940, Epidata.range(202001, 202010)])
-````
 
 ### JavaScript (in a web browser)
 
 ````html
 <!-- Imports -->
-<script src="jquery.js"></script>
 <script src="delphi_epidata.js"></script>
 <!-- Fetch data -->
 <script>
-  var callback = function(result, message, epidata) {
-    console.log(result, message, epidata != null ? epidata.length : void 0);
-  };
-  Epidata.nowcast(callback, ['nat'], [201940, Epidata.range(202001, 202010)]);
+  EpidataAsync.nowcast('nat', [201940, EpidataAsync.range(202001, 202010)]).then((res) => {
+    console.log(res.result, res.message, res.epidata != null ? res.epidata.length : 0);
+  });
 </script>
 ````
 

@@ -6,24 +6,15 @@ nav_order: 1
 
 # COVIDcast Epidata API
 
-This is the documentation for accessing the Delphi's COVID-19 Surveillance
-Streams (`covidcast`) endpoint of [Delphi](https://delphi.cmu.edu/)'s
-epidemiological data API. This API provides data on the spread and impact of the
-COVID-19 pandemic across the United States, most of which is available at the
+This is the documentation for accessing Delphi's COVID-19 indicators via the `covidcast` endpoint of [Delphi](https://delphi.cmu.edu/)'s
+epidemiological data API. This API provides data on the spread and impact of the COVID-19 pandemic across the United States, most of which is available at the
 county level and updated daily. This data powers our public [COVIDcast
-map](https://covidcast.cmu.edu/), and includes testing, cases, and death data,
+map](https://delphi.cmu.edu/covidcast/) which includes testing, cases, and death data,
 as well as unique healthcare and survey data Delphi acquires through its
 partners. The API allows users to select specific signals and download data for
 selected geographical areas---counties, states, metropolitan statistical areas,
 and other divisions.
 
-This data is freely available under our [licensing](README.md#data-licensing)
-terms; we encourage academic users to [cite](README.md#citing) the data if they
-use it in any publications. Our [data ingestion
-code](https://github.com/cmu-delphi/covidcast-indicators) and [API server
-code](https://github.com/cmu-delphi/delphi-epidata) is open-source, and
-contributions are welcome. Further documentation on Delphi's APIs is available
-in the [API overview](README.md).
 
 <div style="background-color:#FCC; padding: 10px 30px;"><strong>Get
 updates:</strong> Delphi operates a <a
@@ -41,11 +32,20 @@ href="https://lists.andrew.cmu.edu/mailman/listinfo/delphi-covidcast-api">subscr
 1. TOC
 {:toc}
 
+## Licensing
+Like all other Delphi Epidata datasets, our COVIDcast data is freely available to the public. However, our COVID-19 indicators include data from many different sources, with data licensing handled separately for each source. For a summary of the licenses used and a list of the indicators each license applies to, we suggest users visit our [COVIDcast licensing](covidcast_licensing.md) page. Licensing information is also summarized on each indicator's details page.
+We encourage academic users to [cite](README.md#citing) the data if they
+use it in any publications. Our [data ingestion
+code](https://github.com/cmu-delphi/covidcast-indicators) and [API server
+code](https://github.com/cmu-delphi/delphi-epidata) is open-source, and
+contributions are welcome. Further documentation on Delphi's APIs is available
+in the [API overview](README.md).
+
 ## Accessing the Data
 
-Our [COVIDcast site](https://covidcast.cmu.edu) provides an interactive
+Our [COVIDcast site](https://delphi.cmu.edu/covidcast/) provides an interactive
 visualization of a select set of the data signals available in the COVIDcast
-API, and also provides a data export feature to download any range of data as a
+API, and provides a data export feature to download any data range as a
 CSV file.
 
 Several [API clients are available](covidcast_clients.md) for common programming
@@ -92,8 +92,7 @@ sources and signals.
 ## Constructing API Queries
 
 The COVIDcast API is based on HTTP GET queries and returns data in JSON form.
-The base URL is `https://api.covidcast.cmu.edu/epidata/api.php`.  The covidcast
-endpoint is `https://api.covidcast.cmu.edu/epidata/api.php?source=covidcast`.
+The base URL is `https://api.covidcast.cmu.edu/epidata/covidcast/`.
 
 See [this documentation](README.md) for details on specifying epiweeks, dates,
 and lists.
@@ -106,7 +105,7 @@ and lists.
 | --- | --- | --- |
 | `data_source` | name of upstream data source (e.g., `doctor-visits` or `fb-survey`; [see full list](covidcast_signals.md)) | string |
 | `signal` | name of signal derived from upstream data (see notes below) | string |
-| `time_type` | temporal resolution of the signal (e.g., `day`, `week`) | string |
+| `time_type` | temporal resolution of the signal (e.g., `day`, `week`; see [date coding details](covidcast_times.md)) | string |
 | `geo_type` | spatial resolution of the signal (e.g., `county`, `hrr`, `msa`, `dma`, `state`) | string |
 | `time_values` | time unit (e.g., date) over which underlying events happened | `list` of time values (e.g., 20200401) |
 | `geo_value` | unique code for each location, depending on `geo_type` (see [geographic coding details](covidcast_geography.md)), or `*` for all | string |
@@ -139,10 +138,10 @@ Use cases:
   do not include any updates that became available after June 1, use
   `as_of=20200601`.
 * To retrieve only data that was published or updated on June 1, and exclude
-  records whose most recent update occured earlier than June 1, use
+  records whose most recent update occurred earlier than June 1, use
   `issues=20200601`.
 * To retrieve all data that was published between May 1 and June 1, and exclude
-  records whose most recent update occured earlier than May 1, use
+  records whose most recent update occurred earlier than May 1, use
   `issues=20200501-20200601`. The results will include all matching issues for
   each `time_value`, not just the most recent.
 * To retrieve only data that was published or updated exactly 3 days after the
@@ -150,10 +149,9 @@ Use cases:
 
 You should specify only one of these three parameters in any given query.
 
-**Note:** Each issue in the versioning system contains only the records that
-were added or updated during that time unit; we exclude records whose values
+**Note:** Each issue in the versioning system contains only the records added or updated during that time unit; we exclude records whose values
 remain the same as a previous issue. If you have a research problem that would
-require knowing when an unchanged value was last confirmed, please get in touch.
+require knowing when we last confirmed an unchanged value, please get in touch.
 
 ### Response
 
@@ -161,28 +159,55 @@ require knowing when an unchanged value was last confirmed, please get in touch.
 | --- | --- | --- |
 | `result` | result code: 1 = success, 2 = too many results, -2 = no results | integer |
 | `epidata` | list of results, 1 per geo/time pair | array of objects |
+| `epidata[].source` | selected `data_source` | string |
+| `epidata[].signal` | selected `signal` | string |
+| `epidata[].geo_type` | selected `geo_type` | string |
 | `epidata[].geo_value` | location code, depending on `geo_type` | string |
-| `epidata[].time_value` | time unit (e.g. date) over which underlying events happened | integer |
-| `epidata[].direction` | trend classifier (+1 -> increasing, 0 -> steady or not determined, -1 -> decreasing) | integer |
+| `epidata[].time_type` | selected `time_type` | string |
+| `epidata[].time_value` | time unit (e.g. date) over which underlying events happened (see [date coding details](covidcast_times.md)) | integer |
 | `epidata[].value` | value (statistic) derived from the underlying data source | float |
 | `epidata[].stderr` | approximate standard error of the statistic with respect to its sampling distribution, `null` when not applicable | float |
+| `epidata[].direction` | trend classifier (+1 -> increasing, 0 -> steady or not determined, -1 -> decreasing) | integer |
 | `epidata[].sample_size` | number of "data points" used in computing the statistic, `null` when not applicable | float |
 | `epidata[].issue` | time unit (e.g. date) when this statistic was published | integer |
 | `epidata[].lag` | time delta (e.g. days) between when the underlying events happened and when this statistic was published | integer |
+| `epidata[].missing_value` | an integer code that is zero when the `value` field is present and non-zero when the data is missing (see [missing codes](missing_codes.md)) | integer |
+| `epidata[].missing_stderr` | an integer code that is zero when the `stderr` field is present and non-zero when the data is missing (see [missing codes](missing_codes.md)) | integer |
+| `epidata[].missing_sample_size` | an integer code that is zero when the `sample_size` field is present and non-zero when the data is missing (see [missing codes](missing_codes.md)) | integer |
 | `message` | `success` or error message | string |
 
 **Note:** `result` code 2, "too many results", means that the number of results
 you requested was greater than the API's maximum results limit. Results will be
 returned, but not all of the results you requested. API clients should check the
-results code, and should consider breaking up their requests across multiple API
-calls, such as by breaking a request for a large time interval into multiple
-requests for smaller time intervals.
+results code and consider breaking up requests for e.g. large time intervals into multiple
+API calls.
+
+### Alternative Response Formats
+
+In addition to the default EpiData Response format, users can customize the response format using the `format=` parameter.
+
+#### JSON List Response
+
+When setting the format parameter to `format=json`, it will return a plain list of the `epidata` response objects without the `result` and `message` wrapper. The status of the query is returned via HTTP status codes. For example, a status code of 200 means the query succeeded, while 400 indicates that the query has a missing, misspelled, or otherwise invalid parameter. For all status codes != 200, the returned JSON includes details about what part of the query couldn't be interpreted.
+
+#### CSV File Response
+
+When setting the format parameter to `format=csv`, it will return a CSV file with same columns as the response objects. HTTP status codes are used to communicate success/failure, similar to `format=json`.
+
+#### JSON New Lines Response
+
+When setting the format parameter to `format=jsonl`, it will return each row as an JSON file separated by a single new line character `\n`. This format is useful for incremental streaming of the results. Similar to the JSON list response status codes are used.
+
+### Limit Returned Fields
+
+The `fields` parameter can be used to limit which fields are included in each returned row. This is useful in web applications to reduce the amount of data transmitted. The `fields` parameter supports two syntaxes: allow and deny. Using allowlist syntax, only the listed fields will be returned. For example, `fields=geo_value,value` will drop all fields from the returned data except for `geo_value` and `value`. To use denylist syntax instead, prefix each field name with a dash (-) to exclude it from the results. For example, `fields=-direction` will include all fields in the returned data except for the `direction` field.
+
 
 ## Example URLs
 
 ### Facebook Survey CLI on 2020-04-06 to 2010-04-10 (county 06001)
 
-https://api.covidcast.cmu.edu/epidata/api.php?source=covidcast&data_source=fb-survey&signal=raw_cli&time_type=day&geo_type=county&time_values=20200406-20200410&geo_value=06001
+https://api.covidcast.cmu.edu/epidata/covidcast/?data_source=fb-survey&signal=smoothed_cli&time_type=day&geo_type=county&time_values=20200406-20200410&geo_value=06001
 
 ```json
 {
@@ -204,7 +229,7 @@ https://api.covidcast.cmu.edu/epidata/api.php?source=covidcast&data_source=fb-su
 
 ### Facebook Survey CLI on 2020-04-06 (all counties)
 
-https://api.covidcast.cmu.edu/epidata/api.php?source=covidcast&data_source=fb-survey&signal=raw_cli&time_type=day&geo_type=county&time_values=20200406&geo_value=*
+https://api.covidcast.cmu.edu/epidata/covidcast/?data_source=fb-survey&signal=smoothed_cli&time_type=day&geo_type=county&time_values=20200406&geo_value=*
 
 ```json
 {

@@ -1,14 +1,14 @@
 ---
 title: Wikipedia Access
-parent: Epidata API (Other Epidemics)
+parent: Epidata API (Other Diseases)
 ---
 
 # Wikipedia Access
 
-This is the documentation of the API for accessing the Wikipedia Access (`wiki`) data source of
-the [Delphi](https://delphi.cmu.edu/)'s epidemiological data.
+This is the API documentation for accessing the Wikipedia Access (`wiki`)
+endpoint of [Delphi](https://delphi.cmu.edu/)'s epidemiological data.
 
-General topics not specific to any particular data source are discussed in the
+General topics not specific to any particular endpoint are discussed in the
 [API overview](README.md). Such topics include:
 [contributing](README.md#contributing), [citing](README.md#citing), and
 [data licensing](README.md#data-licensing).
@@ -16,7 +16,7 @@ General topics not specific to any particular data source are discussed in the
 ## Wikipedia Access Data
 
 Number of page visits for selected English, Influenza-related wikipedia articles.
- - Data source: [Wikimedia](https://dumps.wikimedia.org/other/pagecounts-raw/)
+ - Source: [Wikimedia](https://dumps.wikimedia.org/other/pagecounts-raw/)
  - Temporal Resolution: Hourly, daily, and weekly from 2007-12-09 (2007w50)
  - Spatial Resolution: N/A
  - Other resolution: By article ([54](../../labels/articles.txt))
@@ -24,7 +24,7 @@ Number of page visits for selected English, Influenza-related wikipedia articles
 
 # The API
 
-The base URL is: https://delphi.cmu.edu/epidata/api.php
+The base URL is: https://delphi.cmu.edu/epidata/wiki/
 
 See [this documentation](README.md) for details on specifying epiweeks, dates, and lists.
 
@@ -66,7 +66,7 @@ Note:
 # Example URLs
 
 ### Wikipedia Access article "influenza" on 2020w01
-https://delphi.cmu.edu/epidata/api.php?source=wiki&language=en&articles=influenza&epiweeks=202001
+https://delphi.cmu.edu/epidata/wiki/?language=en&articles=influenza&epiweeks=202001
 
 ```json
 {
@@ -86,7 +86,7 @@ https://delphi.cmu.edu/epidata/api.php?source=wiki&language=en&articles=influenz
 ```
 
 ### Wikipedia Access article "influenza" on date 2020-01-01
-https://delphi.cmu.edu/epidata/api.php?source=wiki&language=en&articles=influenza&dates=20200101
+https://delphi.cmu.edu/epidata/wiki/?language=en&articles=influenza&dates=20200101
 
 ```json
 {
@@ -107,35 +107,22 @@ https://delphi.cmu.edu/epidata/api.php?source=wiki&language=en&articles=influenz
 
 # Code Samples
 
-Libraries are available for [CoffeeScript](../../src/client/delphi_epidata.coffee), [JavaScript](../../src/client/delphi_epidata.js), [Python](../../src/client/delphi_epidata.py), and [R](../../src/client/delphi_epidata.R).
+Libraries are available for [JavaScript](../../src/client/delphi_epidata.js), [Python](../../src/client/delphi_epidata.py), and [R](../../src/client/delphi_epidata.R).
 The following samples show how to import the library and fetch national Wikipedia Access data for article "influenza" on
 epiweeks `201940` and `202001-202010` (11 weeks total) for hours 0 and 12 in English.
 
 <!-- TODO: check syntax for optional arguments -->
 
-### CoffeeScript (in Node.js)
-
-````coffeescript
-# Import
-{Epidata} = require('./delphi_epidata')
-# Fetch data
-callback = (result, message, epidata) ->
-  console.log(result, message, epidata?.length)
-Epidata.fluview_clinical(callback, ['influenza'], undefined, [201940, Epidata.range(202001, 202010)], [0, 12])
-````
-
 ### JavaScript (in a web browser)
 
 ````html
 <!-- Imports -->
-<script src="jquery.js"></script>
 <script src="delphi_epidata.js"></script>
 <!-- Fetch data -->
 <script>
-  var callback = function(result, message, epidata) {
-    console.log(result, message, epidata != null ? epidata.length : void 0);
-  };
-  Epidata.fluview_clinical(callback, ['influenza'], null, [201940, Epidata.range(202001, 202010)], [0, 12]);
+  EpidataAsync.wiki('influenza', null, [201940, Epidata.EpidataAsync(202001, 202010)], [0, 12]).then((res) => {
+    console.log(res.result, res.message, res.epidata != null ? res.epidata.length : 0);
+  });
 </script>
 ````
 

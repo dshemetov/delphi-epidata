@@ -1,14 +1,14 @@
 ---
 title: NIDSS Flu
-parent: Epidata API (Other Epidemics)
+parent: Epidata API (Other Diseases)
 ---
 
 # NIDSS Flu
 
-This is the documentation of the API for accessing the NIDSS Flu (`nidss_flu`) data source of
+This is the documentation of the API for accessing the NIDSS Flu (`nidss_flu`) endpoint of
 the [Delphi](https://delphi.cmu.edu/)'s epidemiological data.
 
-General topics not specific to any particular data source are discussed in the
+General topics not specific to any particular endpoint are discussed in the
 [API overview](README.md). Such topics include:
 [contributing](README.md#contributing), [citing](README.md#citing), and
 [data licensing](README.md#data-licensing).
@@ -16,7 +16,7 @@ General topics not specific to any particular data source are discussed in the
 ## NIDSS Flu Data
 
 Outpatient ILI from Taiwan's National Infectious Disease Statistics System (NIDSS).
- - Data source: [Taiwan CDC](http://nidss.cdc.gov.tw/en/CDCWNH01.aspx?dc=wnh)
+ - Source: [Taiwan CDC](http://nidss.cdc.gov.tw/en/CDCWNH01.aspx?dc=wnh)
  - Temporal Resolution: Weekly* from 2008w14
  - Spatial Resolution: By [hexchotomy region](https://en.wikipedia.org/wiki/Regions_of_Taiwan#Hexchotomy) ([6+1](../../labels/nidss_regions.txt))
  - Open access
@@ -25,7 +25,7 @@ Outpatient ILI from Taiwan's National Infectious Disease Statistics System (NIDS
 
 # The API
 
-The base URL is: https://delphi.cmu.edu/epidata/api.php
+The base URL is: https://delphi.cmu.edu/epidata/nidss_flu/
 
 See [this documentation](README.md) for details on specifying epiweeks, dates, and lists.
 
@@ -67,7 +67,7 @@ If neither is specified, the current issues are used.
 # Example URLs
 
 ### NIDSS Flu on 2015w01 (nationwide)
-https://delphi.cmu.edu/epidata/api.php?source=nidss_flu&regions=nationwide&epiweeks=201501
+https://delphi.cmu.edu/epidata/nidss_flu/?regions=nationwide&epiweeks=201501
 
 ```json
 {
@@ -90,32 +90,19 @@ https://delphi.cmu.edu/epidata/api.php?source=nidss_flu&regions=nationwide&epiwe
 
 # Code Samples
 
-Libraries are available for [CoffeeScript](../../src/client/delphi_epidata.coffee), [JavaScript](../../src/client/delphi_epidata.js), [Python](../../src/client/delphi_epidata.py), and [R](../../src/client/delphi_epidata.R).
+Libraries are available for [JavaScript](../../src/client/delphi_epidata.js), [Python](../../src/client/delphi_epidata.py), and [R](../../src/client/delphi_epidata.R).
 The following samples show how to import the library and fetch national NIDSS Flu data for epiweeks `201440` and `201501-201510` (11 weeks total).
-
-### CoffeeScript (in Node.js)
-
-````coffeescript
-# Import
-{Epidata} = require('./delphi_epidata')
-# Fetch data
-callback = (result, message, epidata) ->
-  console.log(result, message, epidata?.length)
-Epidata.nidss_flu(callback, ['nationwide'], [201440, Epidata.range(201501, 201510)])
-````
 
 ### JavaScript (in a web browser)
 
 ````html
 <!-- Imports -->
-<script src="jquery.js"></script>
 <script src="delphi_epidata.js"></script>
 <!-- Fetch data -->
 <script>
-  var callback = function(result, message, epidata) {
-    console.log(result, message, epidata != null ? epidata.length : void 0);
-  };
-  Epidata.nidss_flu(callback, ['nationwide'], [201440, Epidata.range(201501, 201510)]);
+  EpidataAsync.nidss_flu('nationwide', [201440, EpidataAsync.range(201501, 201510)]).then((res) => {
+    console.log(res.result, res.message, res.epidata != null ? res.epidata.length : 0);
+  });;
 </script>
 ````
 

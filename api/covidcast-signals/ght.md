@@ -1,6 +1,6 @@
 ---
 title: Google Health Trends
-parent: Data Sources and Signals
+parent: Inactive Signals
 grand_parent: COVIDcast Epidata API
 ---
 
@@ -8,9 +8,13 @@ grand_parent: COVIDcast Epidata API
 {: .no_toc}
 
 * **Source name:** `ght`
-* **Number of data revisions since 19 May 2020:** 0
+* **Earliest issue available:** April 29, 2020
+* **Number of data revisions since May 19, 2020:** 0
 * **Date of last change:** Never
 * **Available for:** dma, hrr, msa, state (see [geography coding docs](../covidcast_geography.md))
+* **Time type:** day (see [date format docs](../covidcast_times.md))
+
+## Overview
 
 This data source (`ght`) is based on Google searches, provided to us by Google
 Health Trends. Using this search data, we estimate the volume of COVID-related
@@ -18,12 +22,17 @@ searches in a given location, on a given day. This signal is measured in
 arbitrary units (its scale is meaningless); larger numbers represent higher
 numbers of COVID-related searches.
 
+These signals were updated daily until March 8, 2021. After that date, Google
+dropped support for Google Health Trends access. We recommend the
+[Google Symptoms source](google-symptoms.md) as an alternative, which provides
+finer-grained measures of search volume at the symptom level.
+
 | Signal | Description |
 | --- | --- |
-| `raw_search` | Google search volume for COVID-related searches, in arbitrary units that are normalized for population |
-| `smoothed_search` | Google search volume for COVID-related searches, in arbitrary units that are normalized for population, smoothed in time as [described below](#smoothing) |
+| `raw_search` | Google search volume for COVID-related searches, in arbitrary units that are normalized for population <br/> **Earliest date available:** 2020-02-01 |
+| `smoothed_search` | Google search volume for COVID-related searches, in arbitrary units that are normalized for population, smoothed in time as [described below](#smoothing) <br/> **Earliest date available:** 2020-02-01 |
 
-## Table of contents
+## Table of Contents
 {: .no_toc .text-delta}
 
 1. TOC
@@ -50,7 +59,7 @@ view of such information through [Google Trends](https://trends.google.com).
 DMA-level data are aggregated to the MSA and HRR level through
 population-weighted averaging.
 
-## Smoothing
+### Smoothing
 
 The smoothed signal is produced using the following strategy. For each date, we
 fit a local linear regression, using a Gaussian kernel, with only data on or
@@ -66,5 +75,6 @@ reported as 0. Areas with low query volume hence exhibit jumps and
 zero-inflation, as small variations in the signal can cause it to be sometimes
 truncated to 0 and sometimes reported at its actual level.
 
-Google does not describe the units of its reported numbers, so the scale is
-arbitrary.
+Google does not describe the units of its reported numbers, so the scale is arbitrary.
+
+

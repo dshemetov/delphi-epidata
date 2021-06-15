@@ -1,14 +1,14 @@
 ---
 title: Digital Surveillance Sensors
-parent: Epidata API (Other Epidemics)
+parent: Epidata API (Other Diseases)
 ---
 
 # Digital Surveillance Sensors
 
-This is the documentation of the API for accessing the Delphi's Digital Surveillance Sensors (`sensors`) data source of
+This is the documentation of the API for accessing the Digital Surveillance Sensors (`sensors`) endpoint of
 the [Delphi](https://delphi.cmu.edu/)'s epidemiological data.
 
-General topics not specific to any particular data source are discussed in the
+General topics not specific to any particular endpoint are discussed in the
 [API overview](README.md). Such topics include:
 [contributing](README.md#contributing), [citing](README.md#citing), and
 [data licensing](README.md#data-licensing).
@@ -26,13 +26,10 @@ Trends, etc., during the COVID-19 pandemic, because these were designed to track
 ILI as driven by seasonal influenza, and were NOT designed to track ILI during
 the COVID-19 pandemic.
 
-We are working on collecting new ILI-related data sources may be useful to
-nowcasting and forecasting ILI during the COVID-19 pandemic, and will make these
-available as soon as possible.
 
 # The API
 
-The base URL is: https://delphi.cmu.edu/epidata/api.php
+The base URL is: https://delphi.cmu.edu/epidata/sensors/
 
 See [this documentation](README.md) for details on specifying epiweeks, dates, and lists.
 
@@ -73,7 +70,7 @@ Notes:
 # Example URLs
 
 ### Delphi's Digital Surveillance SAR3 Sensor on 2020w01 (national)
-https://delphi.cmu.edu/epidata/api.php?source=sensors&names=sar3&locations=nat&epiweeks=202001
+https://delphi.cmu.edu/epidata/sensors/?names=sar3&locations=nat&epiweeks=202001
 
 ```json
 {
@@ -93,32 +90,19 @@ https://delphi.cmu.edu/epidata/api.php?source=sensors&names=sar3&locations=nat&e
 
 # Code Samples
 
-Libraries are available for [CoffeeScript](../../src/client/delphi_epidata.coffee), [JavaScript](../../src/client/delphi_epidata.js), [Python](../../src/client/delphi_epidata.py), and [R](../../src/client/delphi_epidata.R).
+Libraries are available for [JavaScript](../../src/client/delphi_epidata.js), [Python](../../src/client/delphi_epidata.py), and [R](../../src/client/delphi_epidata.R).
 The following samples show how to import the library and fetch national Delphi's Digital Surveillance SAR3 Sensor data for epiweeks `201940` and `202001-202010` (11 weeks total).
-
-### CoffeeScript (in Node.js)
-
-````coffeescript
-# Import
-{Epidata} = require('./delphi_epidata')
-# Fetch data
-callback = (result, message, epidata) ->
-  console.log(result, message, epidata?.length)
-Epidata.sensors(callback, ['nat'], ['sar3'], [201940, Epidata.range(202001, 202010)])
-````
 
 ### JavaScript (in a web browser)
 
 ````html
 <!-- Imports -->
-<script src="jquery.js"></script>
 <script src="delphi_epidata.js"></script>
 <!-- Fetch data -->
 <script>
-  var callback = function(result, message, epidata) {
-    console.log(result, message, epidata != null ? epidata.length : void 0);
-  };
-  Epidata.sensors(callback, ['nat'], ['sar3'], [201940, Epidata.range(202001, 202010)]);
+  EpidataAsync.sensors('nat', 'sar3', [201940, EpidataAsync.range(202001, 202010)]).then((res) => {
+    console.log(res.result, res.message, res.epidata != null ? res.epidata.length : 0);
+  });
 </script>
 ````
 

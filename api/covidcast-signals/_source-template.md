@@ -8,10 +8,12 @@ grand_parent: COVIDcast Epidata API
 {: .no_toc}
 
 * **Source name:** `SOURCE-API-NAME`
-* **First issued:** DATE RELEASED TO API
+* **Earliest issue available:** DATE RELEASED TO API
 * **Number of data revisions since 19 May 2020:** 0
 * **Date of last change:** Never
 * **Available for:** county, hrr, msa, state (see [geography coding docs](../covidcast_geography.md))
+* **Time type:** day (see [date format docs](../covidcast_times.md))
+* **License:** [LICENSE NAME](../covidcast_licensing.md#APPLICABLE-SECTION)
 
 A brief description of what this source measures.
 
@@ -67,7 +69,7 @@ If this signal is reported with a consistent lag, describe it here.
 If this signal is regularly backfilled, describe the reason and nature of the
 backfill here.
 
-## Source
+## Source and Licensing
 
 If the signal has specific licensing or sourcing that should be acknowledged,
 describe it here. Also, include links to source websites for data that is
