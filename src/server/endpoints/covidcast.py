@@ -35,7 +35,7 @@ from .._validate import (
 from .._pandas import as_pandas, print_pandas
 from .covidcast_utils import compute_trend, compute_trends, compute_correlations, compute_trend_value, CovidcastMetaEntry
 from ..utils import shift_time_value, date_to_time_value, time_value_to_iso, time_value_to_date
-from .covidcast_utils.model import TimeType, data_sources, create_source_signal_alias_mapper, create_source_signal_group_transform_mapper
+from .covidcast_utils.model import TimeType, data_sources, create_source_signal_alias_mapper, create_source_signal_group_transform
 
 # first argument is the endpoint name
 bp = Blueprint("covidcast", __name__)
@@ -131,7 +131,7 @@ def parse_smoother_args():
 def handle():
     source_signal_pairs = parse_source_signal_pairs()
     source_signal_pairs, alias_mapper = create_source_signal_alias_mapper(source_signal_pairs)
-    source_signal_pairs, group_transform_mapper, alias_mapper_transform, iterator_buffer = create_source_signal_group_transform_mapper(source_signal_pairs)
+    source_signal_pairs, group_transform, iterator_buffer = create_source_signal_group_transform(source_signal_pairs)
     time_pairs = parse_time_pairs()
     geo_pairs = parse_geo_pairs()
     # TODO: Write an actual smoother arg parser.
@@ -173,11 +173,10 @@ def handle():
         parsed_rows = (parse_row(row, fields_string, fields_int, fields_float) for row in rows)
         buffered_rows = iterator_buffer(parsed_rows, lambda row: (row["source"], row["signal"]))
         for key, group in groupby(buffered_rows, lambda row: (row["source"], row["signal"], row["_tag"])):
-            transformed_group = group_transform_mapper(key[0], key[1], group, **smoother_args)
+            transformed_group = group_transform(*key, group, **smoother_args)
             for row in transformed_group:
                 if not is_compatibility and alias_mapper:
-                    row["source"] = alias_mapper(row["source"], row["signal"])  # map source back to user alias
-                row["signal"] = alias_mapper_transform(row["source"], row["signal"], row["_tag"])  # map signal back to user-requested vs raw signal name
+                    row["source"] = alias_mapper(row["source"], row["signal"])
                 yield row
 
     # execute first query

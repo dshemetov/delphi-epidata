@@ -161,6 +161,7 @@ class DataSignal:
     def key(self) -> Tuple[str, str]:
         return (self.source, self.signal)
 
+
 @dataclass
 class DataSource:
     source: str
@@ -219,7 +220,9 @@ def _load_data_signals(sources: List[DataSource]):
     data_signals_df = data_signals_df.replace({np.nan: None})
     data_signals_df.columns = map(_clean_column, data_signals_df.columns)
     ignore_columns = {"base_is_other"}
-    data_signals: List[DataSignal] = [DataSignal(**{k: v for k, v in d.items() if k not in ignore_columns}) for d in data_signals_df.to_dict(orient="records")]
+    data_signals: List[DataSignal] = [
+        DataSignal(**{k: v for k, v in d.items() if k not in ignore_columns}) for d in data_signals_df.to_dict(orient="records")
+    ]
     data_signals_df.set_index(["source", "signal"])
 
     by_source_id = {d.key: d for d in data_signals}
@@ -283,7 +286,9 @@ def create_source_signal_alias_mapper(source_signals: List[SourceSignalPair]) ->
     return transformed_pairs, map_row
 
 
-def _resolve_all_signals(source_signals: Union[SourceSignalPair, List[SourceSignalPair]]) -> Union[SourceSignalPair, List[SourceSignalPair]]:
+def _resolve_all_signals(
+    source_signals: Union[SourceSignalPair, List[SourceSignalPair]], data_sources_by_id: DataFrame
+) -> Union[SourceSignalPair, List[SourceSignalPair]]:
     if isinstance(source_signals, SourceSignalPair):
         if source_signals.signal == True:
             source = data_sources_by_id.get(source_signals.source)
@@ -365,14 +370,14 @@ def _buffer_and_tag_iterator(it: Iterable[Dict], counts: Counter, key_prop: Call
 
     # Buffer pass as needed.
     for key in buffer:
-        for i in range(counts[key]-1):
+        for i in range(counts[key] - 1):
             for x in buffer[key]:
                 x = x.copy()
                 x["_tag"] = i + 1
                 yield x
 
 
-def create_source_signal_group_transform_mapper(source_signals: List[SourceSignalPair]) -> Tuple[List[SourceSignalPair], Dict]:
+def create_source_signal_group_transform(source_signals: List[SourceSignalPair]) -> Tuple[List[SourceSignalPair], Dict]:
     # This should resolve ("source", True) pairs to signal lists, except for sources not present in data_signals_by_key.
     source_signals = _resolve_all_signals(source_signals)
     transformed_pairs: List[SourceSignalPair] = []
@@ -404,22 +409,15 @@ def create_source_signal_group_transform_mapper(source_signals: List[SourceSigna
     # if the user originally requested ('jhu-csse', 'incidence_cumulative_num').
     def transform_group(source: str, signal: str, tag: int, group: Iterable[Dict], **kwargs) -> Iterable[Dict]:
         transform: Callable = transform_dict.get((source, signal, tag))
-        if transform:
-            return transform(group, **kwargs)
-        return group
+        transformed_group = transform(group, **kwargs) if transform else group
+        for row in transformed_group:
+            # Given a (source, signal, tag) tuple, returns the original user request signal name.
+            # E.g. the tuple ('jhu-csse', 'confirmed_cumulative_num', 1) may return 'incidence_cumulative_num'
+            # if the user originally requested ('jhu-csse', 'incidence_cumulative_num').
+            row["signal"] = alias_to_data_signals.setdefault((source, signal, tag), signal)
+            yield row
 
-    # Given a (source, signal, tag) tuple, returns the original user request signal name.
-    # E.g. the tuple ('jhu-csse', 'confirmed_cumulative_num', 1) may return 'incidence_cumulative_num'
-    # if the user originally requested ('jhu-csse', 'incidence_cumulative_num').
-    def map_row(source: str, signal: str, tag: int) -> str:
-        """
-        maps a given row source back to its alias version
-        """
-        return alias_to_data_signals.setdefault((source, signal, tag), signal)
+    # Buffer the iterator by counting signal repetitions.
+    iterator_buffer: Generator = lambda x, y: _buffer_and_tag_iterator(x, _get_signal_counts(source_signals), y)
 
-    # Return a dictionary of the number of signal repeats in a List[SourceSignalPairs]. Used by
-    # _buffer_and_tag_iterator in the covidcast endpoint.
-    counts: Counter = _get_signal_counts(source_signals)
-    iterator_buffer: Generator = lambda x, y: _buffer_and_tag_iterator(x, counts, y)
-
-    return transformed_pairs, transform_group, map_row, iterator_buffer
+    return transformed_pairs, transform_group, iterator_buffer

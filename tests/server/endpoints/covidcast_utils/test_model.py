@@ -10,12 +10,13 @@ from delphi.epidata.server.endpoints.covidcast_utils.model import (
     DIFF,
     SMOOTH,
     DIFF_SMOOTH,
+    data_sources_by_id,
     data_signals_by_key,
     _resolve_all_signals,
     _get_parent_transform,
     _get_signal_counts,
     _buffer_and_tag_iterator,
-    create_source_signal_group_transform_mapper,
+    create_source_signal_group_transform,
 )
 
 class TestStreaming:
@@ -136,7 +137,7 @@ class TestStreaming:
         expected_signal_counts = Counter({("src1", "sig1"): 3, ("src1", "sig2"): 2, ("src2", "sig1"): 1})
         assert signal_counts == expected_signal_counts
 
-    def test_create_source_signal_group_transform_mapper(self):
+    def test_create_source_signal_group_transform(self):
         source_signal_pair = SourceSignalPair(
             source="jhu-csse",
             signal=[
@@ -158,18 +159,15 @@ class TestStreaming:
                 "deaths_incidence_prop",
             ],
         )
-        [transformed_pairs], transform_group, map_row, iterator_buffer = create_source_signal_group_transform_mapper([source_signal_pair])
+        [transformed_pairs], transform_group, iterator_buffer = create_source_signal_group_transform([source_signal_pair])
         dummy_iterable: Iterable[Dict] = [{"src1": 1}]
 
-        for i, signal in enumerate(transformed_pairs.signal):
-            # check that map_row returns the appropriate signal names back
-            assert map_row("jhu-csse", signal, i) == source_signal_pair.signal[i]
-            # if map_row does no aliasing, make sure that transform_group is the identity mapping
-            if map_row("jhu-csse", signal, i) == signal[i]:
-                assert transform_group("jhu-csse", signal, i, dummy_iterable) == dummy_iterable
+        iterable = [{}]
+        assert transform_group("jhu-csse", "confirmed_cumulative_num", 0, iterable) == iterable
+        assert transform_group("jhu-csse", "confirmed_cumulative_num", 1, iterable) != iterable
 
         source_signal_pair = SourceSignalPair(
             source="src1",
             signal=True)
-        [transformed_pairs], transform_group, map_row, iterator_buffer = create_source_signal_group_transform_mapper([source_signal_pair])
+        [transformed_pairs], transform_group, iterator_buffer = create_source_signal_group_transform([source_signal_pair])
         assert transformed_pairs == source_signal_pair
