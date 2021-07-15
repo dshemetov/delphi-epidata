@@ -35,7 +35,7 @@ from .._validate import (
 from .._pandas import as_pandas, print_pandas
 from .covidcast_utils import compute_trend, compute_trends, compute_correlations, compute_trend_value, CovidcastMetaEntry
 from ..utils import shift_time_value, date_to_time_value, time_value_to_iso, time_value_to_date
-from .covidcast_utils.model import TimeType, data_sources, create_source_signal_alias_mapper, create_source_signal_group_transform
+from .covidcast_utils.model import TimeType, data_sources, create_source_signal_alias_mapper, create_basename_signal_transformer, get_parent_transform
 
 # first argument is the endpoint name
 bp = Blueprint("covidcast", __name__)
@@ -131,7 +131,7 @@ def parse_smoother_args():
 def handle():
     source_signal_pairs = parse_source_signal_pairs()
     source_signal_pairs, alias_mapper = create_source_signal_alias_mapper(source_signal_pairs)
-    source_signal_pairs, group_transform, iterator_buffer = create_source_signal_group_transform(source_signal_pairs)
+    source_signal_pairs, iterator_buffer = create_basename_signal_transformer(source_signal_pairs)
     time_pairs = parse_time_pairs()
     geo_pairs = parse_geo_pairs()
     # TODO: Write an actual smoother arg parser.
@@ -172,9 +172,14 @@ def handle():
     def gen(rows):
         parsed_rows = (parse_row(row, fields_string, fields_int, fields_float) for row in rows)
         buffered_rows = iterator_buffer(parsed_rows, lambda row: (row["source"], row["signal"]))
-        for key, group in groupby(buffered_rows, lambda row: (row["source"], row["signal"], row["_tag"])):
-            transformed_group = group_transform(*key, group, **smoother_args)
+        group_keyfunc = lambda entry: (entry[0]["source"], entry[0]["signal"], entry[1])
+        for key, group in groupby(buffered_rows, group_keyfunc):
+            original_source_signal_tuple = key[2]
+            group_transform = get_parent_transform(original_source_signal_tuple)
+            transformed_group = group_transform(group, **smoother_args)
             for row in transformed_group:
+                row["source"] = original_source_signal_tuple[0]
+                row["signal"] = original_source_signal_tuple[1]
                 if not is_compatibility and alias_mapper:
                     row["source"] = alias_mapper(row["source"], row["signal"])
                 yield row

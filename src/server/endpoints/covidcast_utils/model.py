@@ -1,9 +1,11 @@
 from collections import Counter
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Callable, Generator, Optional, Dict, List, Set, Tuple, Iterable, Counter, Union
+from typing import Any, Callable, Generator, Optional, Dict, List, Set, Tuple, Iterable, Counter, Union
 from pathlib import Path
 import re
+from numpy.lib.utils import source
 import pandas as pd
 import numpy as np
 from pandas.core.frame import DataFrame
@@ -12,7 +14,7 @@ from ..._params import SourceSignalPair
 from .smooth_diff import generate_smooth_rows, generate_row_diffs
 
 
-IDENTITY = lambda rows: rows
+IDENTITY = lambda rows, **kwargs: rows
 DIFF = lambda rows, **kwargs: generate_row_diffs(rows, **kwargs)
 SMOOTH = lambda rows, **kwargs: generate_smooth_rows(rows, **kwargs)
 DIFF_SMOOTH = lambda rows, **kwargs: generate_smooth_rows(generate_row_diffs(rows, **kwargs), **kwargs)
@@ -296,128 +298,116 @@ def _resolve_all_signals(
                 return SourceSignalPair(source.source, [s.signal for s in source.signals])
         return source_signals
     if isinstance(source_signals, list):
-        return [_resolve_all_signals(pair) for pair in source_signals]
+        return [_resolve_all_signals(pair, data_sources_by_id) for pair in source_signals]
     raise TypeError("source_signals is not Union[SourceSignalPair, List[SourceSignalPair]].")
 
 
-def _get_parent_signal(signal: DataSignal, data_signals_by_key: DataFrame) -> DataSignal:
-    parent_signal = data_signals_by_key.get((signal.source, signal.signal_basename))
-    if parent_signal:
-        return parent_signal
-    return signal
-
-
-def _get_parent_transform(signal: DataSignal, data_signals_by_key: DataFrame) -> Callable:
-    if signal.format not in [SignalFormat.raw, SignalFormat.raw_count, SignalFormat.count]:
-        return IDENTITY
-
-    parent_signal = _get_parent_signal(signal, data_signals_by_key)
-    if signal.is_cumulative and signal.is_smoothed:
-        return SMOOTH
-    if not signal.is_cumulative and not signal.is_smoothed:
-        return DIFF if parent_signal.is_cumulative else IDENTITY
-    if not signal.is_cumulative and signal.is_smoothed:
-        return DIFF_SMOOTH if parent_signal.is_cumulative else SMOOTH
-    return IDENTITY
-
-
-def _get_signal_counts(source_signal_pairs: List[SourceSignalPair]) -> Counter[Tuple[str, str]]:
-    """Count source-signal pair occurrences.
-
-    Assumes a reduced List[SourceSignalPair] from _params._combine_source_signal_pairs.
-    Returns a Counter keyed by (source, signal) tuples.
-    """
-    counts: Counter[Tuple[str, str]] = Counter()
-
-    for source_signal_pair in source_signal_pairs:
-        source, signals = source_signal_pair.source, source_signal_pair.signal
-        if isinstance(signals, bool):
-            continue
-        counts += Counter([(source, signal) for signal in signals])
-
-    return counts
-
-
-def _buffer_and_tag_iterator(it: Iterable[Dict], counts: Counter, key_prop: Callable) -> Iterable[Dict]:
+def _buffer_and_tag_iterator(
+    it: Iterable[Dict], name_dict: Dict[Tuple[str, str], List[Tuple[str, str]]], keyfunc: Callable[[Dict], Tuple[str, str]]
+) -> Iterable[Dict]:
     """Buffer an iterator for repeated passes.
 
     Parameters
     ----------
     it: Iterable[Dict]
         The iterator of dictionaries.
-    counts: Counter
-        A Counter object taking keys from key_prop and returning the number of times to run through each
-        iterable with the key_prop value. E.g. each iterable is a row value for a signal and the Counter keys
+    name_dict: Dict[Tuple[str, str], List[Tuple[str, str]]]
+        A dictionary with keys pointing to lists. If an entry in the iterable matches a key in the name_dict,
+        the entry will be buffered and repeated the number of times equivalent to the length of the list
+        iterable with the keyfunc value. E.g. each iterable is a row value for a signal and the Counter keys
         are (source, signal) tuples.
-    key_prop: Callable
-        A function taking an element of the iterator and returning a key of the counts. Used to identify
-        elements and store them in the buffer if needed.
+    keyfunc: Callable
+        A function used to derive a name_dict key from a dictionary in the iterator.
 
     Returns
     ----------
-    An iterator that runs through the iterator at least once and repeats other values as specified by counts.
-    Additionally, sets the value of the "_tag" key for every Dict in the iterator according to the number of
-    times the given sequence of iterable values have been repeated (starting from 0).
+    An iterator that runs through the original iterator values that do not match a name_dict key once, then runs
+    through the values as specified by counts. Additionally, sets the value of the "_tag" key for every Dict in
+    the iterator according to the number of times the given sequence of iterable values have been repeated (starting
+    from 1).
     """
-    buffer = {}
+    buffer = dict()
+    _name_dict = deepcopy(name_dict)
+
     # First iterator pass.
     for x in it:
-        key = key_prop(x)
-        if counts.get(key) is not None and counts[key] > 1:
+        key: Tuple[str, str] = keyfunc(x)
+        if _name_dict.get(key):
             buffer.setdefault(key, []).append(x)
-        x["_tag"] = 0
-        yield x
+            continue
+        yield x, key
 
     # Buffer pass as needed.
     for key in buffer:
-        for i in range(counts[key] - 1):
+        for value in _name_dict[key]:
             for x in buffer[key]:
-                x = x.copy()
-                x["_tag"] = i + 1
-                yield x
+                yield x, value
 
 
-def create_source_signal_group_transform(source_signals: List[SourceSignalPair]) -> Tuple[List[SourceSignalPair], Dict]:
-    # This should resolve ("source", True) pairs to signal lists, except for sources not present in data_signals_by_key.
-    source_signals = _resolve_all_signals(source_signals)
-    transformed_pairs: List[SourceSignalPair] = []
-    transform_dict: Dict[Tuple[str, str, int], Callable] = {}
-    alias_to_data_signals: Dict[Tuple[str, str, int], str] = {}
+def _get_basename_signals(
+    source_signals: List[SourceSignalPair],
+    data_sources_by_id: Dict[str, DataFrame] = data_sources_by_id,
+    data_signals_by_key: Dict[str, DataFrame] = data_signals_by_key,
+) -> Tuple[List[SourceSignalPair], Dict]:
+
+    source_signals = _resolve_all_signals(source_signals, data_sources_by_id)
+    base_signal_pairs: List[SourceSignalPair] = []
+    name_dict = dict()
 
     for pair in source_signals:
         source_name: str = pair.source
         signals: List[str] = []
 
         if isinstance(pair.signal, bool):
-            transformed_pairs.append(pair)
+            base_signal_pairs.append(pair)
             continue
 
-        for i, signal_name in enumerate(pair.signal):
+        for signal_name in pair.signal:
             signal: DataSignal = data_signals_by_key.get((source_name, signal_name))
             if not signal or not signal.compute_from_base:
                 signals.append(signal_name)
                 continue
 
             signals.append(signal.signal_basename)
-            transform_dict[(source_name, signal.signal_basename, i)] = _get_parent_transform(signal, data_signals_by_key)
-            alias_to_data_signals[(source_name, signal.signal_basename, i)] = signal_name
-        transformed_pairs.append(SourceSignalPair(pair.source, signals))
+            name_dict.setdefault((source_name, signal.signal_basename), []).append((source_name, signal_name))
+        base_signal_pairs.append(SourceSignalPair(pair.source, signals))
 
-    # Given a (source, signal, tag) tuple and the grouped-by Iterable[Dict] of that source-signal's rows
-    # returns a transformed version of the rows (transforming the rows to what the user requested).
-    # E.g. the tuple ('jhu-csse', 'confirmed_cumulative_num', 1) may return a differenced version of the same signal
-    # if the user originally requested ('jhu-csse', 'incidence_cumulative_num').
-    def transform_group(source: str, signal: str, tag: int, group: Iterable[Dict], **kwargs) -> Iterable[Dict]:
-        transform: Callable = transform_dict.get((source, signal, tag))
-        transformed_group = transform(group, **kwargs) if transform else group
-        for row in transformed_group:
-            # Given a (source, signal, tag) tuple, returns the original user request signal name.
-            # E.g. the tuple ('jhu-csse', 'confirmed_cumulative_num', 1) may return 'incidence_cumulative_num'
-            # if the user originally requested ('jhu-csse', 'incidence_cumulative_num').
-            row["signal"] = alias_to_data_signals.setdefault((source, signal, tag), signal)
-            yield row
+    return base_signal_pairs, name_dict
 
-    # Buffer the iterator by counting signal repetitions.
-    iterator_buffer: Generator = lambda x, y: _buffer_and_tag_iterator(x, _get_signal_counts(source_signals), y)
 
-    return transformed_pairs, transform_group, iterator_buffer
+def _get_parent_signal(signal: DataSignal, data_signals_by_key: Dict[Tuple[str, str], DataFrame] = data_signals_by_key) -> DataSignal:
+    parent_signal = data_signals_by_key.get((signal.source, signal.signal_basename))
+    if parent_signal:
+        return parent_signal
+    return signal
+
+
+def get_parent_transform(signal: Union[DataSignal, Tuple[str, str]], data_signals_by_key: Dict[Tuple[str, str], DataFrame] = data_signals_by_key) -> Callable:
+    if isinstance(signal, DataSignal):
+        if signal.format not in [SignalFormat.raw, SignalFormat.raw_count, SignalFormat.count]:
+            return IDENTITY
+
+        parent_signal = _get_parent_signal(signal, data_signals_by_key)
+        if signal.is_cumulative and signal.is_smoothed:
+            return SMOOTH
+        if not signal.is_cumulative and not signal.is_smoothed:
+            return DIFF if parent_signal.is_cumulative else IDENTITY
+        if not signal.is_cumulative and signal.is_smoothed:
+            return DIFF_SMOOTH if parent_signal.is_cumulative else SMOOTH
+        return IDENTITY
+    if isinstance(signal, tuple):
+        signal = data_signals_by_key.get(signal)
+        if signal:
+            return get_parent_transform(signal, data_signals_by_key)
+        return IDENTITY
+
+    raise TypeError("signal must be either str or DataSignal.")
+
+
+def create_basename_signal_transformer(source_signals: List[SourceSignalPair],
+    data_sources_by_id: Dict[str, DataFrame] = data_sources_by_id,
+    data_signals_by_key: Dict[str, DataFrame] = data_signals_by_key) -> Tuple[List[SourceSignalPair]]:
+    base_signal_pairs, name_dict = _get_basename_signals(source_signals, data_sources_by_id, data_signals_by_key)
+    iterator_buffer = lambda it, keyfunc: _buffer_and_tag_iterator(it, name_dict, keyfunc)
+
+    return base_signal_pairs, iterator_buffer
